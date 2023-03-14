@@ -7,7 +7,8 @@ import re
 
 
 async def extract_table_name(statement: str):
-    match = re.search(r"FROM\s+(\w+)", statement)
+    pattern = re.compile(r"from\s+(\w+)", re.IGNORECASE)
+    match = pattern.search(statement)
     if match:
         table_name = match.group(1)
         return table_name
