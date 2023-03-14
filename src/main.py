@@ -47,4 +47,4 @@ async def execute_sql(text: str = Body(..., media_type="text/plain")):
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="localhost", port=8000, reload=True)  # type: ignore
+    uvicorn.run("main:app", host="localhost", port=5000, reload=True)  # type: ignore
