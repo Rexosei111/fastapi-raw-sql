@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Union
 from datetime import date, time, datetime
 from enum import Enum
 
@@ -10,7 +10,7 @@ class EnumYesOrNo(str, Enum):
 
 
 class TbParameterRead(BaseModel):
-    id_parameter: int
+    id_parameter: Optional[int]
     databasename: Optional[str]
     tablename: Optional[str]
     id_select: EnumYesOrNo
@@ -23,7 +23,7 @@ class TbParameterRead(BaseModel):
 
 
 class TbTableRead(BaseModel):
-    idc: int
+    idc: Optional[Union[int, None]]
     xname: Optional[str]
     xaddress: Optional[str]
     xdate: Optional[date]

@@ -102,8 +102,6 @@ async def execute_select_sql_command(sql_statement: str):
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Something went wrong",
             )
-    db_data = [
-        {**TbTableRead.parse_obj(dict(zip(TbTableRead.__fields__.keys(), row))).dict()}
-        for row in results
-    ]
+    db_data = [dict(zip(results.keys(), row)) for row in results]
+
     return db_data
