@@ -59,6 +59,11 @@ async def get_db_parameter(table_name: str):
 async def execute_sql_command(sql_statement: str):
     statement = text(sql_statement)
     table_name, command = await extract_table_name(sql_statement)
+    if command.lower() == "select":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{command} is not allowed on this endpoint",
+        )
     db_parameter_data = await get_db_parameter(table_name)
     column_value = db_parameter_data[command_and_columns[command.lower()]]
     if column_value == "no":
@@ -86,7 +91,12 @@ async def execute_sql_command(sql_statement: str):
 async def execute_select_sql_command(sql_statement: str):
     statement = text(sql_statement)
     table_name, command = await extract_table_name(sql_statement)
-    db_parameter_data = await get_db_parameter(table_name)
+    if command.lower() != "select":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{command} is not allowed on this endpoint",
+        )
+    db_parameter_data = await get_db_parameter(table_name)  # type: ignore
     column_value = db_parameter_data[command_and_columns[command.lower()]]
     if column_value == "no":
         raise HTTPException(
