@@ -5,13 +5,25 @@ from fastapi import HTTPException, status
 from schemas import TbTableRead, TbParameterRead
 import re
 
+command_and_columns = {
+    "select": "id_select",
+    "update": "id_update",
+    "insert": "id_insert",
+    "delete": "id_delete",
+    "drop": "id_drop",
+    "truncate": "id_truncate",
+    "alter": "id_alter",
+    "token": "id_token",
+}
+
 
 async def extract_table_name(statement: str):
-    pattern = re.compile(r"from\s+(\w+)", re.IGNORECASE)
+    pattern = re.compile(r"tb_table_(\d+)", re.IGNORECASE)
+    command = statement.split(" ")[0]
     match = pattern.search(statement)
     if match:
         table_name = match.group(1)
-        return table_name
+        return f"tb_table_{table_name}", command
     else:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Could not get table name"
@@ -46,6 +58,14 @@ async def get_db_parameter(table_name: str):
 
 async def execute_sql_command(sql_statement: str):
     statement = text(sql_statement)
+    table_name, command = await extract_table_name(sql_statement)
+    db_parameter_data = await get_db_parameter(table_name)
+    column_value = db_parameter_data[command_and_columns[command.lower()]]
+    if column_value == "no":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"You are not allowed to execute {command} command on this table",
+        )
     async with db_transaction_engine.begin() as connection:  # type: ignore
         try:
             await connection.execute(statement)
@@ -65,6 +85,14 @@ async def execute_sql_command(sql_statement: str):
 
 async def execute_select_sql_command(sql_statement: str):
     statement = text(sql_statement)
+    table_name, command = await extract_table_name(sql_statement)
+    db_parameter_data = await get_db_parameter(table_name)
+    column_value = db_parameter_data[command_and_columns[command.lower()]]
+    if column_value == "no":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"You are not allowed to execute {command} command on this table",
+        )
     async with db_transaction_engine.begin() as connection:
         try:
             results = await connection.execute(statement)  # type: ignore
@@ -74,15 +102,8 @@ async def execute_select_sql_command(sql_statement: str):
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Something went wrong",
             )
-    table_name = await extract_table_name(sql_statement)
-    db_parameter_data = await get_db_parameter(table_name)
     db_data = [
-        {
-            **TbTableRead.parse_obj(
-                dict(zip(TbTableRead.__fields__.keys(), row))
-            ).dict(),
-            "tb_parameter": db_parameter_data,
-        }
+        {**TbTableRead.parse_obj(dict(zip(TbTableRead.__fields__.keys(), row))).dict()}
         for row in results
     ]
     return db_data
