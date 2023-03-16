@@ -51,9 +51,9 @@ async def execute_select_sql(
 @app.post("/api/v1/exesql")
 async def execute_sql(
     text: str = Body(..., media_type="text/plain"),
-    token: Optional[str] = Header(default=None, alias="Authorization"),
+    authorization: Optional[str] = Header(default=None)
 ):
-    await execute_sql_command(sql_statement=text, authorization_token=token)
+    await execute_sql_command(sql_statement=text, authorization_token=authorization)
     return {"codestatus": 200, "msg": "success"}
 
 
