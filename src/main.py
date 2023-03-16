@@ -1,11 +1,14 @@
+from typing import Optional
 from fastapi import FastAPI, Body, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from services import execute_select_sql_command, execute_sql_command
+from services import execute_select_sql_command, execute_sql_command, login_user
+from fastapi import Header
 import uvicorn
+from schemas import LoginData
 
 app = FastAPI()
 
@@ -35,15 +38,28 @@ async def value_error_exception_handler(request: Request, exc: RequestValidation
 
 
 @app.post("/api/v1/opensql")
-async def execute_select_sql(text: str = Body(..., media_type="text/plain")):
-    result = await execute_select_sql_command(sql_statement=text)
+async def execute_select_sql(
+    text: str = Body(..., media_type="text/plain"),
+    authorization: Optional[str] = Header(default=None),
+):
+    result = await execute_select_sql_command(
+        sql_statement=text, authorization_token=authorization
+    )
     return result
 
 
 @app.post("/api/v1/exesql")
-async def execute_sql(text: str = Body(..., media_type="text/plain")):
-    await execute_sql_command(sql_statement=text)
+async def execute_sql(
+    text: str = Body(..., media_type="text/plain"),
+    token: Optional[str] = Header(default=None, alias="Authorization"),
+):
+    await execute_sql_command(sql_statement=text, authorization_token=token)
     return {"codestatus": 200, "msg": "success"}
+
+
+@app.post("/api/v1/login")
+async def login(data: LoginData):
+    return await login_user(data=data)
 
 
 if __name__ == "__main__":

@@ -8,6 +8,9 @@ load_dotenv()
 class Settings(BaseSettings):
     db_parameter_url: PostgresDsn
     db_transaction_url: PostgresDsn
+    jwt_secret: str
+    algorithm: str
+    jwt_expire_time: int
 
     class Config:
         env_file = ".env"

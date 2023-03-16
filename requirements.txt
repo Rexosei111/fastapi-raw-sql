@@ -3,3 +3,4 @@ sqlalchemy
 uvicorn
 asyncpg
 python-dotenv
+python-jose

@@ -31,3 +31,8 @@ class TbTableRead(BaseModel):
     xtime: Optional[time]
     xint: Optional[int]
     xtimestamp: Optional[datetime]
+
+
+class LoginData(BaseModel):
+    phone: str
+    otp: str
