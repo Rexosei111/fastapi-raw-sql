@@ -6,6 +6,8 @@ from jose import jwt, JWTError
 from typing import Union
 from schemas import LoginData
 import hashlib
+import random
+import string
 
 settings = get_settings()
 
@@ -51,3 +53,24 @@ async def decrypt_access_token(authorization: Union[str, None]):
     except JWTError:
         raise credentials_exception
     return phone
+
+
+def generate_random_data():
+    def random_string(length):
+        letters_and_digits = string.ascii_uppercase + string.digits
+        return "".join(random.choice(letters_and_digits) for i in range(length))
+
+    # Generate a list of 5 dictionaries with random values
+    data = []
+    for i in range(5):
+        row = {
+            "xname": random_string(10),
+            "xaddress": random_string(20),
+            "xdate": f"2022-03-{random.randint(1, 31):02}",
+            "xprice": round(random.uniform(10.0, 100.0), 2),
+            "xtime": f"{random.randint(0, 23):02}:{random.randint(0, 59):02}:{random.randint(0, 59):02}",
+            "xint": random.randint(1, 100),
+            "xtimestamp": f"2022-03-{random.randint(1, 31):02} {random.randint(0, 23):02}:{random.randint(0, 59):02}:{random.randint(0, 59):02}",
+        }
+        data.append(row)
+    return data

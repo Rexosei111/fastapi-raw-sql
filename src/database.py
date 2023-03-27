@@ -24,8 +24,8 @@ class TbParameters(Base):
 
 settings = get_settings()
 db_parameter_engine = create_async_engine(
-    settings.db_parameter_url, future=True, echo=True
+    settings.db_parameter_url, future=True, echo=False
 )
 db_transaction_engine = create_async_engine(
-    settings.db_transaction_url, future=True, echo=True
+    settings.db_transaction_url, future=True, echo=False
 )

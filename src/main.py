@@ -5,7 +5,12 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from services import execute_select_sql_command, execute_sql_command, login_user
+from services import (
+    execute_select_sql_command,
+    execute_sql_command,
+    login_user,
+    generate_report,
+)
 from fastapi import Header
 import uvicorn
 from schemas import LoginData
@@ -51,7 +56,7 @@ async def execute_select_sql(
 @app.post("/api/v1/exesql")
 async def execute_sql(
     text: str = Body(..., media_type="text/plain"),
-    authorization: Optional[str] = Header(default=None)
+    authorization: Optional[str] = Header(default=None),
 ):
     await execute_sql_command(sql_statement=text, authorization_token=authorization)
     return {"codestatus": 200, "msg": "success"}
@@ -60,6 +65,11 @@ async def execute_sql(
 @app.post("/api/v1/login")
 async def login(data: LoginData):
     return await login_user(data=data)
+
+
+@app.get("/api/v1/report")
+async def get_report():
+    return await generate_report()
 
 
 if __name__ == "__main__":
