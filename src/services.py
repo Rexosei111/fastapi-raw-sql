@@ -1,51 +1,16 @@
-import datetime
 from typing import Optional
 from database import db_parameter_engine, db_transaction_engine, TbParameters
-from sqlalchemy import text, select
-from sqlalchemy.exc import SQLAlchemyError, NoResultFound, IntegrityError
-from asyncpg.exceptions import UndefinedTableError
+from sqlalchemy import text, select, inspect
+from sqlalchemy.exc import SQLAlchemyError, NoResultFound, IntegrityError, NoSuchTableError, ProgrammingError
 from fastapi import HTTPException, status
 from schemas import TbParameterRead, LoginData
-import re
 from utils import (
     create_access_tokens,
     encrypt_otp_with_md5,
     decrypt_access_token,
-    generate_random_data,
+    command_and_columns,
+    patterns
 )
-from docxtpl import DocxTemplate
-from functools import reduce
-
-patterns = {
-    "select": re.compile(r"[Ss][Ee][Ll][Ee][Cc][Tt].+[Ff][Rr][Oo][Mm]\s+([\w.]+)", re.IGNORECASE),
-    "update": re.compile(r"[Uu][Pp][Dd][Aa][Tt][Ee]\s+([\w.]+)", re.IGNORECASE),
-    "insert": re.compile(r"[Ii][Nn][Tt][Oo]\s+([\w.]+)", re.IGNORECASE),
-    "delete": re.compile(
-        r"[Dd][Ee][Ll][Ee][Tt][Ee]\s+[Ff][Rr][Oo][Mm]\s+([\w.]+)", re.IGNORECASE
-    ),
-    "alter": re.compile(
-        r"[Aa][Ll][Tt][Ee][Rr]\s+[Tt][Aa][Bb][Ll][Ee]\s+([\w.]+)", re.IGNORECASE
-    ),
-    "truncate": re.compile(
-        r"[Tt][Rr][Uu][Nn][Cc][Aa][Tt][Ee]\s+[Tt][Aa][Bb][Ll][Ee]\s+([\w.]+)",
-        re.IGNORECASE,
-    ),
-    "drop": re.compile(
-        r"[Dd][Rr][Oo][Pp]\s+[Tt][Aa][Bb][Ll][Ee]\s+([\w.]+)", re.IGNORECASE
-    ),
-}
-
-command_and_columns = {
-    "select": "id_select",
-    "update": "id_update",
-    "insert": "id_insert",
-    "delete": "id_delete",
-    "drop": "id_drop",
-    "truncate": "id_truncate",
-    "alter": "id_alter",
-    "token": "id_token",
-}
-
 
 async def extract_table_name(statement: str):
     command = statement.split(" ")[0]
@@ -53,7 +18,6 @@ async def extract_table_name(statement: str):
     match = pattern.search(statement)  # type: ignore
     if match:
         table_name = match.group(1)
-        print(table_name)
         return f"{table_name}", command
     else:
         raise HTTPException(
@@ -69,7 +33,7 @@ async def get_db_parameter(table_name: str):
             data_db = results.fetchone()  # type: ignore
             if data_db is None:
                 raise HTTPException(404, detail=f"Table {table_name} not found")
-        except SQLAlchemyError as msg:
+        except SQLAlchemyError:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Something went wrong",
@@ -144,14 +108,13 @@ async def execute_select_sql_command(
     async with db_transaction_engine.begin() as connection:
         try:
             results = await connection.execute(statement)  # type: ignore
-        except UndefinedTableError:
-            await connection.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Table not found",
-            )
         except SQLAlchemyError as msg:
             await connection.rollback()
+            if isinstance(msg, ProgrammingError):
+                raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Something went wrong, probably table was not found.",
+            )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Something went wrong.",
@@ -192,37 +155,36 @@ async def login_user(data: LoginData):
         "expires_in": expire_time,
     }
 
-
-async def generate_report():
-    # statement = text(f"SELECT * FROM tb_table_02")
-    # async with db_transaction_engine.begin() as connection:
-    #     try:
-    #         results = await connection.execute(statement)  # type: ignore
-    #     except NoResultFound:
-    #         await connection.rollback()
-    #         raise HTTPException(
-    #             status_code=status.HTTP_404_NOT_FOUND, detail=f"User not found"
-    #         )
-    #     except SQLAlchemyError as msg:
-    #         await connection.rollback()
-    #         raise HTTPException(
-    #             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-    #             detail="Something went wrong",
-    #         )
-    # db_data = [dict(zip(results.keys(), row)) for row in results]
-    db_data = generate_random_data()
-    total_price = reduce(lambda x, y: x + y["xprice"], db_data, 0)
-    template = DocxTemplate("src/templates/template_1.docx")
-    context = {
-        "timestamp": datetime.datetime.now(),
-        "database_name": "db_transaction",
-        "results": db_data,
-        "total_price": total_price,
-    }
-    try:
-        template.render(context)
-        template.save("src/reports/report_01.docx")
-        return True
-    except Exception as msg:
-        print(msg)
-        raise HTTPException(500, detail="Unable to generate report")
+async def view_db_tables():
+    async with db_transaction_engine.begin() as connection:
+        try:
+            
+            tables = await connection.run_sync(
+                lambda sync_conn: inspect(sync_conn).get_table_names()
+            )
+            return tables
+        except SQLAlchemyError:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Unable to retrive table names",
+            )
+        
+async def view_table_columns(table_name: str):
+    async with db_transaction_engine.begin() as connection:
+        try:
+            
+            columns = await connection.run_sync(
+                lambda sync_conn: inspect(sync_conn).get_columns(table_name)
+            )
+            db_columns = [{"name" : column.get("name"), "type": str(column.get("type"))} for column in columns]
+            return db_columns
+        except SQLAlchemyError as msg:
+            if isinstance(msg, NoSuchTableError):
+                raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Table not found",
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Unable to retrive table columns",
+            )
