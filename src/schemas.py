@@ -36,3 +36,4 @@ class TbTableRead(BaseModel):
 class LoginData(BaseModel):
     phone: str
     otp: str
+

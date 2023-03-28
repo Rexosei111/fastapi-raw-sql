@@ -9,7 +9,8 @@ from services import (
     execute_select_sql_command,
     execute_sql_command,
     login_user,
-    generate_report,
+    view_db_tables,
+    view_table_columns
 )
 from fastapi import Header
 import uvicorn
@@ -67,9 +68,20 @@ async def login(data: LoginData):
     return await login_user(data=data)
 
 
-@app.get("/api/v1/report")
-async def get_report():
-    return await generate_report()
+@app.get("/api/v1/tables")
+async def view_tables():
+    """
+    Get the List of names of tables in the database
+    """
+    return await view_db_tables()
+
+@app.get("/api/v1/tables/{table_name}")
+async def view_db_table_columns(table_name: str):
+    """
+     Get the List of columns for a specific table
+    """
+    return await view_table_columns(table_name)
+
 
 
 if __name__ == "__main__":

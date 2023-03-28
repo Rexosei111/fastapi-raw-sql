@@ -6,8 +6,7 @@ from jose import jwt, JWTError
 from typing import Union
 from schemas import LoginData
 import hashlib
-import random
-import string
+import re
 
 settings = get_settings()
 
@@ -55,22 +54,33 @@ async def decrypt_access_token(authorization: Union[str, None]):
     return phone
 
 
-def generate_random_data():
-    def random_string(length):
-        letters_and_digits = string.ascii_uppercase + string.digits
-        return "".join(random.choice(letters_and_digits) for i in range(length))
+patterns = {
+    "select": re.compile(r"[Ss][Ee][Ll][Ee][Cc][Tt].+[Ff][Rr][Oo][Mm]\s+([\w.]+)", re.IGNORECASE),
+    "update": re.compile(r"[Uu][Pp][Dd][Aa][Tt][Ee]\s+([\w.]+)", re.IGNORECASE),
+    "insert": re.compile(r"[Ii][Nn][Tt][Oo]\s+([\w.]+)", re.IGNORECASE),
+    "delete": re.compile(
+        r"[Dd][Ee][Ll][Ee][Tt][Ee]\s+[Ff][Rr][Oo][Mm]\s+([\w.]+)", re.IGNORECASE
+    ),
+    "alter": re.compile(
+        r"[Aa][Ll][Tt][Ee][Rr]\s+[Tt][Aa][Bb][Ll][Ee]\s+([\w.]+)", re.IGNORECASE
+    ),
+    "truncate": re.compile(
+        r"[Tt][Rr][Uu][Nn][Cc][Aa][Tt][Ee]\s+[Tt][Aa][Bb][Ll][Ee]\s+([\w.]+)",
+        re.IGNORECASE,
+    ),
+    "drop": re.compile(
+        r"[Dd][Rr][Oo][Pp]\s+[Tt][Aa][Bb][Ll][Ee]\s+([\w.]+)", re.IGNORECASE
+    ),
+}
 
-    # Generate a list of 5 dictionaries with random values
-    data = []
-    for i in range(5):
-        row = {
-            "xname": random_string(10),
-            "xaddress": random_string(20),
-            "xdate": f"2022-03-{random.randint(1, 31):02}",
-            "xprice": round(random.uniform(10.0, 100.0), 2),
-            "xtime": f"{random.randint(0, 23):02}:{random.randint(0, 59):02}:{random.randint(0, 59):02}",
-            "xint": random.randint(1, 100),
-            "xtimestamp": f"2022-03-{random.randint(1, 31):02} {random.randint(0, 23):02}:{random.randint(0, 59):02}:{random.randint(0, 59):02}",
-        }
-        data.append(row)
-    return data
+
+command_and_columns = {
+    "select": "id_select",
+    "update": "id_update",
+    "insert": "id_insert",
+    "delete": "id_delete",
+    "drop": "id_drop",
+    "truncate": "id_truncate",
+    "alter": "id_alter",
+    "token": "id_token",
+}
