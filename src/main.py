@@ -87,7 +87,7 @@ async def view_db_table_columns(table_name: str):
 
 @app.post("/api/v1/reports")
 async def generate_db_report(data: ReqBody):
-    return await generate_report(data)
+    return await generate_report(data) #type: ignore
 
 
 if __name__ == "__main__":
