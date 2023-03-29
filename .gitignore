@@ -167,3 +167,4 @@ setup.cfg
 
 nohup.out
 *.rest
+*.docx

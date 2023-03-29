@@ -55,7 +55,9 @@ async def decrypt_access_token(authorization: Union[str, None]):
 
 
 patterns = {
-    "select": re.compile(r"[Ss][Ee][Ll][Ee][Cc][Tt].+[Ff][Rr][Oo][Mm]\s+([\w.]+)", re.IGNORECASE),
+    "select": re.compile(
+        r"[Ss][Ee][Ll][Ee][Cc][Tt].+[Ff][Rr][Oo][Mm]\s+([\w.]+)", re.IGNORECASE
+    ),
     "update": re.compile(r"[Uu][Pp][Dd][Aa][Tt][Ee]\s+([\w.]+)", re.IGNORECASE),
     "insert": re.compile(r"[Ii][Nn][Tt][Oo]\s+([\w.]+)", re.IGNORECASE),
     "delete": re.compile(
@@ -84,3 +86,11 @@ command_and_columns = {
     "alter": "id_alter",
     "token": "id_token",
 }
+
+
+import subprocess
+
+
+def convert_to_pdf(doc_path):
+    cmd = ["unoconv", "--format=pdf", doc_path]
+    subprocess.call(cmd)

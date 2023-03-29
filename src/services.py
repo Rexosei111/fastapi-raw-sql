@@ -20,6 +20,7 @@ from utils import (
     decrypt_access_token,
     command_and_columns,
     patterns,
+    convert_to_pdf,
 )
 
 
@@ -208,8 +209,8 @@ async def generate_report(data: ReqBody):
     statement = text(data.query)
     template = None
     context = {
-            "timestamp": datetime.datetime.now(),
-            "database_name": "db_transaction",
+        "timestamp": datetime.datetime.now(),
+        "database_name": "db_transaction",
     }
     if data.template_name == "template_1":
         async with db_transaction_engine.begin() as connection:
@@ -222,7 +223,6 @@ async def generate_report(data: ReqBody):
                         status_code=status.HTTP_404_NOT_FOUND,
                         detail="Table not found",
                     )
-                print(msg)
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="Something went wrong",
@@ -231,7 +231,8 @@ async def generate_report(data: ReqBody):
         total_price = reduce(lambda x, y: x + y["xprice"], db_data, 0)
         total_value = reduce(lambda x, y: x + y.get("xint", 0), db_data, 0)
         template = DocxTemplate(f"src/templates/{data.template_name}.docx")
-        context = {**context,
+        context = {
+            **context,
             "results": db_data,
             "total_price": total_price,
             "total_value": total_value,
@@ -244,9 +245,10 @@ async def generate_report(data: ReqBody):
                 invoice = results.fetchone()
                 if invoice is None:
                     raise HTTPException(404, detail="Invoice not found")
-                statement = text(f"SELECT * FROM tb_invoicedetail WHERE id_invoice = '{db_invoice.get('id_invoice')}'") # type: ignore
+                db_invoice = dict(zip(results.keys(), invoice))
+                statement = text(f"SELECT * FROM tb_invoicedetail WHERE id_invoice = '{db_invoice.get('id_invoice')}'")  # type: ignore
                 results = await connection.execute(statement)  # type: ignore
-                
+
             except SQLAlchemyError as msg:
                 await connection.rollback()
                 if isinstance(msg, NoSuchTableError):
@@ -258,11 +260,12 @@ async def generate_report(data: ReqBody):
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="Something went wrong",
                 )
-        db_invoice = dict(zip(results.keys(), invoice))  # type: ignore
+        # type: ignore
         db_data = [dict(zip(results.keys(), row)) for row in results]
         total_value = reduce(lambda x, y: x + y.get("sub_total", 0), db_data, 0)
         template = DocxTemplate(f"src/templates/{data.template_name}.docx")
-        context = {**context,
+        context = {
+            **context,
             "id_invoice": db_invoice.get("id_invoice"),
             "namecustumer": db_invoice.get("namecustumer"),
             "details": db_data,
@@ -274,8 +277,7 @@ async def generate_report(data: ReqBody):
             raise HTTPException(404, detail="unable to identify template")
         template.render(context)
         template.save(f"src/reports/{data.output_name}.docx")
-        # convert(f"src/reports/{data.output_name}.docx")
+        convert_to_pdf(f"src/reports/{data.output_name}.docx")
         return True
     except Exception as msg:
-        print(msg)
         raise HTTPException(500, detail="Unable to generate report")
