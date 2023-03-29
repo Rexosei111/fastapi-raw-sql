@@ -1,16 +1,27 @@
+import datetime
+from functools import reduce
 from typing import Optional
 from database import db_parameter_engine, db_transaction_engine, TbParameters
 from sqlalchemy import text, select, inspect
-from sqlalchemy.exc import SQLAlchemyError, NoResultFound, IntegrityError, NoSuchTableError, ProgrammingError
+from sqlalchemy.exc import (
+    SQLAlchemyError,
+    NoResultFound,
+    IntegrityError,
+    NoSuchTableError,
+    ProgrammingError,
+)
+from docx2pdf import convert
 from fastapi import HTTPException, status
-from schemas import TbParameterRead, LoginData
+from schemas import ReqBody, TbParameterRead, LoginData
+from docxtpl import DocxTemplate
 from utils import (
     create_access_tokens,
     encrypt_otp_with_md5,
     decrypt_access_token,
     command_and_columns,
-    patterns
+    patterns,
 )
+
 
 async def extract_table_name(statement: str):
     command = statement.split(" ")[0]
@@ -112,9 +123,9 @@ async def execute_select_sql_command(
             await connection.rollback()
             if isinstance(msg, ProgrammingError):
                 raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Something went wrong, probably table was not found.",
-            )
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Something went wrong, probably table was not found.",
+                )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Something went wrong.",
@@ -155,10 +166,10 @@ async def login_user(data: LoginData):
         "expires_in": expire_time,
     }
 
+
 async def view_db_tables():
     async with db_transaction_engine.begin() as connection:
         try:
-            
             tables = await connection.run_sync(
                 lambda sync_conn: inspect(sync_conn).get_table_names()
             )
@@ -168,23 +179,103 @@ async def view_db_tables():
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Unable to retrive table names",
             )
-        
+
+
 async def view_table_columns(table_name: str):
     async with db_transaction_engine.begin() as connection:
         try:
-            
             columns = await connection.run_sync(
                 lambda sync_conn: inspect(sync_conn).get_columns(table_name)
             )
-            db_columns = [{"name" : column.get("name"), "type": str(column.get("type"))} for column in columns]
+            db_columns = [
+                {"name": column.get("name"), "type": str(column.get("type"))}
+                for column in columns
+            ]
             return db_columns
         except SQLAlchemyError as msg:
             if isinstance(msg, NoSuchTableError):
                 raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Table not found",
-            )
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Table not found",
+                )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Unable to retrive table columns",
             )
+
+
+async def generate_report(data: ReqBody):
+    statement = text(data.query)
+    template = None
+    context = {
+            "timestamp": datetime.datetime.now(),
+            "database_name": "db_transaction",
+    }
+    if data.template_name == "template_1":
+        async with db_transaction_engine.begin() as connection:
+            try:
+                results = await connection.execute(statement)  # type: ignore
+            except SQLAlchemyError as msg:
+                await connection.rollback()
+                if isinstance(msg, NoSuchTableError):
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="Table not found",
+                    )
+                print(msg)
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Something went wrong",
+                )
+        db_data = [dict(zip(results.keys(), row)) for row in results]
+        total_price = reduce(lambda x, y: x + y["xprice"], db_data, 0)
+        total_value = reduce(lambda x, y: x + y.get("xint", 0), db_data, 0)
+        template = DocxTemplate(f"src/templates/{data.template_name}.docx")
+        context = {**context,
+            "results": db_data,
+            "total_price": total_price,
+            "total_value": total_value,
+        }
+
+    if data.template_name == "template_2":
+        async with db_transaction_engine.begin() as connection:
+            try:
+                results = await connection.execute(statement)  # type: ignore
+                invoice = results.fetchone()
+                if invoice is None:
+                    raise HTTPException(404, detail="Invoice not found")
+                statement = text(f"SELECT * FROM tb_invoicedetail WHERE id_invoice = '{db_invoice.get('id_invoice')}'") # type: ignore
+                results = await connection.execute(statement)  # type: ignore
+                
+            except SQLAlchemyError as msg:
+                await connection.rollback()
+                if isinstance(msg, NoSuchTableError):
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="Table not found",
+                    )
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Something went wrong",
+                )
+        db_invoice = dict(zip(results.keys(), invoice))  # type: ignore
+        db_data = [dict(zip(results.keys(), row)) for row in results]
+        total_value = reduce(lambda x, y: x + y.get("sub_total", 0), db_data, 0)
+        template = DocxTemplate(f"src/templates/{data.template_name}.docx")
+        context = {**context,
+            "id_invoice": db_invoice.get("id_invoice"),
+            "namecustumer": db_invoice.get("namecustumer"),
+            "details": db_data,
+            "total": total_value,
+        }
+
+    try:
+        if template is None:
+            raise HTTPException(404, detail="unable to identify template")
+        template.render(context)
+        template.save(f"src/reports/{data.output_name}.docx")
+        # convert(f"src/reports/{data.output_name}.docx")
+        return True
+    except Exception as msg:
+        print(msg)
+        raise HTTPException(500, detail="Unable to generate report")

@@ -37,3 +37,8 @@ class LoginData(BaseModel):
     phone: str
     otp: str
 
+
+class ReqBody(BaseModel):
+    query: str
+    template_name: str
+    output_name: str

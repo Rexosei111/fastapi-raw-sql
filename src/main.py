@@ -10,11 +10,12 @@ from services import (
     execute_sql_command,
     login_user,
     view_db_tables,
-    view_table_columns
+    view_table_columns,
+    generate_report,
 )
 from fastapi import Header
 import uvicorn
-from schemas import LoginData
+from schemas import LoginData, ReqBody
 
 app = FastAPI()
 
@@ -75,13 +76,18 @@ async def view_tables():
     """
     return await view_db_tables()
 
+
 @app.get("/api/v1/tables/{table_name}")
 async def view_db_table_columns(table_name: str):
     """
-     Get the List of columns for a specific table
+    Get the List of columns for a specific table
     """
     return await view_table_columns(table_name)
 
+
+@app.post("/api/v1/reports")
+async def generate_db_report(data: ReqBody):
+    return await generate_report(data)
 
 
 if __name__ == "__main__":
