@@ -1,5 +1,6 @@
 import datetime
 from functools import reduce
+import os
 from typing import Optional
 from database import db_parameter_engine, db_transaction_engine, TbParameters
 from sqlalchemy import text, select, inspect
@@ -20,8 +21,10 @@ from utils import (
     decrypt_access_token,
     command_and_columns,
     patterns,
-    convert_to_pdf,
 )
+from fastapi.responses import FileResponse
+from docxtpl import InlineImage
+from docx.shared import Mm
 
 
 async def extract_table_name(statement: str):
@@ -207,6 +210,8 @@ async def view_table_columns(table_name: str):
 
 async def generate_report(data: ReqBody):
     statement = text(data.query)
+    base_template_path = os.path.join("src", "templates")
+    base_report_path = os.path.join("src", "reports")
     template = None
     context = {
         "timestamp": datetime.datetime.now(),
@@ -230,12 +235,18 @@ async def generate_report(data: ReqBody):
         db_data = [dict(zip(results.keys(), row)) for row in results]
         total_price = reduce(lambda x, y: x + y["xprice"], db_data, 0)
         total_value = reduce(lambda x, y: x + y.get("xint", 0), db_data, 0)
-        template = DocxTemplate(f"src/templates/{data.template_name}.docx")
+        template = DocxTemplate(f"{os.path.join(base_template_path, data.template_name + '.docx')}")  # type: ignore
         context = {
             **context,
             "results": db_data,
             "total_price": total_price,
             "total_value": total_value,
+            "qr_code": InlineImage(
+                template,
+                os.path.join("src", "qr_code_image.jpg"),
+                width=Mm(60),
+                height=Mm(60),
+            ),
         }
 
     if data.template_name == "template_2":
@@ -263,7 +274,7 @@ async def generate_report(data: ReqBody):
         # type: ignore
         db_data = [dict(zip(results.keys(), row)) for row in results]
         total_value = reduce(lambda x, y: x + y.get("sub_total", 0), db_data, 0)
-        template = DocxTemplate(f"src/templates/{data.template_name}.docx")
+        template = DocxTemplate(f"{os.path.join(base_template_path, data.template_name + '.docx')}")  # type: ignore
         context = {
             **context,
             "id_invoice": db_invoice.get("id_invoice"),
@@ -276,8 +287,22 @@ async def generate_report(data: ReqBody):
         if template is None:
             raise HTTPException(404, detail="unable to identify template")
         template.render(context)
-        template.save(f"src/reports/{data.output_name}.docx")
-        convert_to_pdf(f"src/reports/{data.output_name}.docx")
+        template.save(os.path.join("src", "reports", data.output_name + ".docx"))
         return True
     except Exception as msg:
         raise HTTPException(500, detail="Unable to generate report")
+
+
+async def download_report(report_name: str):
+    report_base_path = os.path.join("src", "reports")
+    if not os.path.exists(os.path.join(report_base_path, report_name)):
+        raise HTTPException(404, detail="Report not found")
+    media_types = {
+        "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "pdf": "application/pdf",
+    }
+    report_type = report_name.split(".")[1]
+    return FileResponse(
+        os.path.join(report_base_path, report_name),
+        media_type=media_types.get(report_type, "docx"),
+    )

@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import os
 
 from fastapi import HTTPException, status
 from config import get_settings
@@ -88,9 +89,12 @@ command_and_columns = {
 }
 
 
-import subprocess
+import aspose.words as aw
 
 
 def convert_to_pdf(doc_path):
-    cmd = ["unoconv", "--format=pdf", doc_path]
-    subprocess.call(cmd)
+    doc = aw.Document(doc_path)  # type: ignore
+    basepath, file = os.path.split(doc_path)
+    filename = file.split(".")[0]
+    output = os.path.join("src", "reports", f"{filename}.pdf")
+    doc.save(output)  # type: ignore

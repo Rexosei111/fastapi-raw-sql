@@ -1,5 +1,6 @@
+import os
 from typing import Optional
-from fastapi import FastAPI, Body, Request
+from fastapi import BackgroundTasks, FastAPI, Body, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -12,7 +13,9 @@ from services import (
     view_db_tables,
     view_table_columns,
     generate_report,
+    download_report,
 )
+from utils import convert_to_pdf
 from fastapi import Header
 import uvicorn
 from schemas import LoginData, ReqBody
@@ -86,8 +89,19 @@ async def view_db_table_columns(table_name: str):
 
 
 @app.post("/api/v1/reports")
-async def generate_db_report(data: ReqBody):
-    return await generate_report(data) #type: ignore
+async def generate_db_report(data: ReqBody, background_tasks: BackgroundTasks):
+    status = await generate_report(data)
+    if status is not True:
+        raise HTTPException(500, detail="Unable to generate report")
+    background_tasks.add_task(
+        convert_to_pdf, os.path.join("src", "reports", data.output_name + ".docx")
+    )
+    return "Done" if status else "Failed"
+
+
+@app.get("/api/v1/reports/download/{report_name}")
+async def download_db_report(report_name: str):
+    return await download_report(report_name)
 
 
 if __name__ == "__main__":
