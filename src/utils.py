@@ -89,12 +89,12 @@ command_and_columns = {
 }
 
 
-import aspose.words as aw
+# import aspose.words as aw
 
 
-def convert_to_pdf(doc_path):
-    doc = aw.Document(doc_path)  # type: ignore
-    basepath, file = os.path.split(doc_path)
-    filename = file.split(".")[0]
-    output = os.path.join("src", "reports", f"{filename}.pdf")
-    doc.save(output)  # type: ignore
+# def convert_to_pdf(doc_path):
+#     doc = aw.Document(doc_path)  # type: ignore
+#     basepath, file = os.path.split(doc_path)
+#     filename = file.split(".")[0]
+#     output = os.path.join("src", "reports", f"{filename}.pdf")
+#     doc.save(output)  # type: ignore
