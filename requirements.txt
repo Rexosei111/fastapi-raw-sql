@@ -5,3 +5,4 @@ asyncpg
 python-dotenv
 python-jose
 python-multipart
+docxtpl

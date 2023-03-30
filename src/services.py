@@ -11,7 +11,6 @@ from sqlalchemy.exc import (
     NoSuchTableError,
     ProgrammingError,
 )
-from docx2pdf import convert
 from fastapi import HTTPException, status
 from schemas import ReqBody, TbParameterRead, LoginData
 from docxtpl import DocxTemplate
@@ -292,6 +291,7 @@ async def generate_report(data: ReqBody):
         template.save(os.path.join(base_report_path, req_data.get("nameoutput") + "." + req_data.get("typefile")))  # type: ignore
         return True
     except Exception as msg:
+        print(msg)
         raise HTTPException(500, detail="Unable to generate report")
 
 
