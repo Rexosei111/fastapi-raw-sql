@@ -37,3 +37,23 @@ class LoginData(BaseModel):
     phone: str
     otp: str
 
+
+class ReqBodyBase(BaseModel):
+    nametemplate: str
+    nameoutput: str
+    typefile: Optional[str] = "docx"
+
+
+class ReqBodySQLTest(ReqBodyBase):
+    query: str
+
+
+class ReqBodySQLMaster(ReqBodyBase):
+    query: str
+    detail_query: str
+
+
+class ReqBody(ReqBodyBase):
+    sqltest: Optional[str]
+    sqltestmaster: Optional[str]
+    sqltestdetail: Optional[str]

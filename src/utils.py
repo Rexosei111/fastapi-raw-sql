@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import os
 
 from fastapi import HTTPException, status
 from config import get_settings
@@ -55,7 +56,9 @@ async def decrypt_access_token(authorization: Union[str, None]):
 
 
 patterns = {
-    "select": re.compile(r"[Ss][Ee][Ll][Ee][Cc][Tt].+[Ff][Rr][Oo][Mm]\s+([\w.]+)", re.IGNORECASE),
+    "select": re.compile(
+        r"[Ss][Ee][Ll][Ee][Cc][Tt].+[Ff][Rr][Oo][Mm]\s+([\w.]+)", re.IGNORECASE
+    ),
     "update": re.compile(r"[Uu][Pp][Dd][Aa][Tt][Ee]\s+([\w.]+)", re.IGNORECASE),
     "insert": re.compile(r"[Ii][Nn][Tt][Oo]\s+([\w.]+)", re.IGNORECASE),
     "delete": re.compile(
@@ -84,3 +87,14 @@ command_and_columns = {
     "alter": "id_alter",
     "token": "id_token",
 }
+
+
+import aspose.words as aw
+
+
+def convert_to_pdf(doc_path):
+    doc = aw.Document(doc_path)  # type: ignore
+    basepath, file = os.path.split(doc_path)
+    filename = file.split(".")[0]
+    output = os.path.join("src", "reports", f"{filename}.pdf")
+    doc.save(output)  # type: ignore
