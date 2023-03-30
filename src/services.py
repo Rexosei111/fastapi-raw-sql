@@ -209,7 +209,7 @@ async def view_table_columns(table_name: str):
 
 
 async def generate_report(data: ReqBody):
-    statement = text(data.query)
+    req_data = data.dict(exclude_none=True, exclude_unset=True)
     base_template_path = os.path.join("src", "templates")
     base_report_path = os.path.join("src", "reports")
     template = None
@@ -217,7 +217,8 @@ async def generate_report(data: ReqBody):
         "timestamp": datetime.datetime.now(),
         "database_name": "db_transaction",
     }
-    if data.template_name == "template_1":
+    if "sqltest" in req_data.keys():
+        statement = text(req_data.get("sqltest"))  # type: ignore
         async with db_transaction_engine.begin() as connection:
             try:
                 results = await connection.execute(statement)  # type: ignore
@@ -235,7 +236,7 @@ async def generate_report(data: ReqBody):
         db_data = [dict(zip(results.keys(), row)) for row in results]
         total_price = reduce(lambda x, y: x + y["xprice"], db_data, 0)
         total_value = reduce(lambda x, y: x + y.get("xint", 0), db_data, 0)
-        template = DocxTemplate(f"{os.path.join(base_template_path, data.template_name + '.docx')}")  # type: ignore
+        template = DocxTemplate(f"{os.path.join(base_template_path, req_data.get('nametemplate') + '.docx')}")  # type: ignore
         context = {
             **context,
             "results": db_data,
@@ -249,16 +250,17 @@ async def generate_report(data: ReqBody):
             ),
         }
 
-    if data.template_name == "template_2":
+    if "sqltestmaster" in req_data.keys():
+        master_statement = text(req_data.get("sqltestmaster"))  # type: ignore
+        detail_statement = text(req_data.get("sqltestdetail"))  # type: ignore
         async with db_transaction_engine.begin() as connection:
             try:
-                results = await connection.execute(statement)  # type: ignore
+                results = await connection.execute(master_statement)  # type: ignore
                 invoice = results.fetchone()
                 if invoice is None:
                     raise HTTPException(404, detail="Invoice not found")
                 db_invoice = dict(zip(results.keys(), invoice))
-                statement = text(f"SELECT * FROM tb_invoicedetail WHERE id_invoice = '{db_invoice.get('id_invoice')}'")  # type: ignore
-                results = await connection.execute(statement)  # type: ignore
+                results = await connection.execute(detail_statement)  # type: ignore
 
             except SQLAlchemyError as msg:
                 await connection.rollback()
@@ -274,7 +276,7 @@ async def generate_report(data: ReqBody):
         # type: ignore
         db_data = [dict(zip(results.keys(), row)) for row in results]
         total_value = reduce(lambda x, y: x + y.get("sub_total", 0), db_data, 0)
-        template = DocxTemplate(f"{os.path.join(base_template_path, data.template_name + '.docx')}")  # type: ignore
+        template = DocxTemplate(f"{os.path.join(base_template_path, req_data.get('nametemplate') + '.docx')}")  # type: ignore
         context = {
             **context,
             "id_invoice": db_invoice.get("id_invoice"),
@@ -285,9 +287,9 @@ async def generate_report(data: ReqBody):
 
     try:
         if template is None:
-            raise HTTPException(404, detail="unable to identify template")
+            raise HTTPException(404, detail="unable to generate report")
         template.render(context)
-        template.save(os.path.join("src", "reports", data.output_name + ".docx"))
+        template.save(os.path.join(base_report_path, req_data.get("nameoutput") + "." + req_data.get("typefile")))  # type: ignore
         return True
     except Exception as msg:
         raise HTTPException(500, detail="Unable to generate report")

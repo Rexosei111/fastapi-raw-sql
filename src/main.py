@@ -1,6 +1,6 @@
 import os
 from typing import Optional
-from fastapi import BackgroundTasks, FastAPI, Body, HTTPException, Request
+from fastapi import FastAPI, Body, File, HTTPException, Request, UploadFile
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -18,7 +18,7 @@ from services import (
 from utils import convert_to_pdf
 from fastapi import Header
 import uvicorn
-from schemas import LoginData, ReqBody
+from schemas import LoginData, ReqBody, ReqBodySQLMaster, ReqBodySQLTest
 
 app = FastAPI()
 
@@ -88,20 +88,39 @@ async def view_db_table_columns(table_name: str):
     return await view_table_columns(table_name)
 
 
-@app.post("/api/v1/reports")
-async def generate_db_report(data: ReqBody, background_tasks: BackgroundTasks):
-    status = await generate_report(data)
-    if status is not True:
-        raise HTTPException(500, detail="Unable to generate report")
-    background_tasks.add_task(
-        convert_to_pdf, os.path.join("src", "reports", data.output_name + ".docx")
-    )
-    return "Done" if status else "Failed"
-
-
 @app.get("/api/v1/reports/download/{report_name}")
 async def download_db_report(report_name: str):
     return await download_report(report_name)
+
+
+@app.post("/api/v1/reports")
+async def generate_db_report(data: ReqBody):
+    status = await generate_report(data)
+    if status is not True:
+        raise HTTPException(500, detail="Unable to generate report")
+    return (
+        {
+            "status": "done",
+        }
+        if status
+        else {"status": "failed"}
+    )
+
+
+@app.post("/api/v1/templates")
+async def upload_template(file: UploadFile = File(...)):
+    if (
+        file.content_type
+        != "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    ):
+        raise HTTPException(status_code=400, detail="Only Word documents are allowed")
+    upload_location = os.path.join("src", "templates", file.filename)  # type: ignore
+    try:
+        with open(upload_location, "wb") as f:  # type: ignore
+            f.write(file.file.read())
+    except:
+        raise HTTPException(500, detail="Unable to write file")
+    return "done"
 
 
 if __name__ == "__main__":
