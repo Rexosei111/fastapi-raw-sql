@@ -15,10 +15,9 @@ from services import (
     generate_report,
     download_report,
 )
-from utils import convert_to_pdf
 from fastapi import Header
 import uvicorn
-from schemas import LoginData, ReqBody, ReqBodySQLMaster, ReqBodySQLTest
+from schemas import LoginData, ReqBody
 
 app = FastAPI()
 
@@ -47,7 +46,7 @@ async def value_error_exception_handler(request: Request, exc: RequestValidation
     )
 
 
-@app.post("/api/v1/opensql")
+@app.post("/api/v1/opensql", tags=["SQL Exec"])
 async def execute_select_sql(
     text: str = Body(..., media_type="text/plain"),
     authorization: Optional[str] = Header(default=None),
@@ -58,7 +57,7 @@ async def execute_select_sql(
     return result
 
 
-@app.post("/api/v1/exesql")
+@app.post("/api/v1/exesql", tags=["SQL Exec"])
 async def execute_sql(
     text: str = Body(..., media_type="text/plain"),
     authorization: Optional[str] = Header(default=None),
@@ -67,12 +66,12 @@ async def execute_sql(
     return {"codestatus": 200, "msg": "success"}
 
 
-@app.post("/api/v1/login")
+@app.post("/api/v1/login", tags=["Authentication"])
 async def login(data: LoginData):
     return await login_user(data=data)
 
 
-@app.get("/api/v1/tables")
+@app.get("/api/v1/tables", tags=["Tables"])
 async def view_tables():
     """
     Get the List of names of tables in the database
@@ -80,7 +79,7 @@ async def view_tables():
     return await view_db_tables()
 
 
-@app.get("/api/v1/tables/{table_name}")
+@app.get("/api/v1/tables/{table_name}", tags=["Tables"])
 async def view_db_table_columns(table_name: str):
     """
     Get the List of columns for a specific table
@@ -88,26 +87,25 @@ async def view_db_table_columns(table_name: str):
     return await view_table_columns(table_name)
 
 
-@app.get("/api/v1/reports/download/{report_name}")
+@app.get("/api/v1/reports/download/{report_name}", tags=["Reports"])
 async def download_db_report(report_name: str):
     return await download_report(report_name)
 
 
-@app.post("/api/v1/reports")
+@app.post("/api/v1/reports", tags=["Reports"])
 async def generate_db_report(data: ReqBody):
     status = await generate_report(data)
     if status is not True:
         raise HTTPException(500, detail="Unable to generate report")
+
     return (
-        {
-            "status": "done",
-        }
+        {"status": "success", "codestatus": 200}
         if status
-        else {"status": "failed"}
+        else {"status": "failed", "codestatus": 500}
     )
 
 
-@app.post("/api/v1/templates")
+@app.post("/api/v1/templates", tags=["Reports"])
 async def upload_template(file: UploadFile = File(...)):
     if (
         file.content_type
