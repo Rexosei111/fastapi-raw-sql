@@ -274,7 +274,7 @@ async def generate_report(data: ReqBody):
                 )
         # type: ignore
         db_data = [dict(zip(results.keys(), row)) for row in results]
-        total_value = reduce(lambda x, y: x + y.get("sub_total", 0), db_data, 0)
+        total_value = reduce(lambda x, y: x + y.get("subtotal", 0), db_data, 0)
         template = DocxTemplate(f"{os.path.join(base_template_path, req_data.get('nametemplate') + '.docx')}")  # type: ignore
         context = {
             **context,
