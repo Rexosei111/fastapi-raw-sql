@@ -24,12 +24,20 @@ from utils import (
 from fastapi.responses import FileResponse
 from docxtpl import InlineImage
 from docx.shared import Mm
+import re
 
 
 async def extract_table_name(statement: str):
-    command = statement.split(" ")[0]
+    # command = statement.split(" ")[0]
+    transformed_statement = statement.replace("\n", " ")
+    match = re.match(r"^\w+", transformed_statement)
+    command = match.group()
     pattern = patterns.get(command.lower())  # type: ignore
-    match = pattern.search(statement)  # type: ignore
+    if not pattern:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Could not get table name"
+        )
+    match = pattern.search(transformed_statement)  # type: ignore
     if match:
         table_name = match.group(1)
         return f"{table_name}", command
