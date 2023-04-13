@@ -28,7 +28,6 @@ import re
 
 
 async def extract_table_name(statement: str):
-    # command = statement.split(" ")[0]
     transformed_statement = statement.replace("\n", " ")
     match = re.match(r"^\w+", transformed_statement)
     command = match.group()
