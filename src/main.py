@@ -112,7 +112,10 @@ async def upload_template(file: UploadFile = File(...)):
         != "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     ):
         raise HTTPException(status_code=400, detail="Only Word documents are allowed")
-    upload_location = os.path.join("src", "templates", file.filename)  # type: ignore
+    upload_location_root = os.path.join("src", "templates")
+    if not os.path.exists(upload_location_root):
+        os.makedirs(upload_location_root)
+    upload_location = os.path.join(upload_location_root, file.filename)  # type: ignore
     try:
         with open(upload_location, "wb") as f:  # type: ignore
             f.write(file.file.read())
